@@ -25,7 +25,7 @@ USER_PROFILES = {
     "משתמש קצה": {"password": "789", "role": "user"}
 }
 
-# 2. שם הקובץ
+# 2. שם הקובץ החדש והנקי שלך
 FILENAME = "mlai_afsankol.xlsx"
 LOG_FILE = "log_שינויי_מלאי.csv"
 
@@ -49,7 +49,7 @@ def log_change(user, location, item, size, old_qty, new_qty, month):
     else:
         new_log_df.to_csv(LOG_FILE, mode='w', header=True, index=False, encoding='utf-8-sig')
 
-# 4. פונקציה לטעינה וסידור המלאי מאקסל
+# 4. פונקציה לטעינה וסידור המלאי מאקסל - תוקנה לחלוטין להגנה מפני ערכי float/NaN
 def load_and_parse_data(file_path):
     if not os.path.exists(file_path):
         return None, f"שגיאה: הקובץ '{file_path}' לא נמצא בתיקיית האפליקציה. אנא ודא שהעלית אותו."
@@ -62,11 +62,16 @@ def load_and_parse_data(file_path):
             df = pd.read_excel(xls, sheet_name=sheet)
             parsed_chunks = []
             
+            # סריקת בלוקים רוחביים של 4 עמודות (שם פריט, מידה, כמות, ריק)
             for i in range(0, df.shape[1], 4):
                 chunk = df.iloc[:, i:i+4]
                 header_row_idx = None
+                
+                # מעבר על השורות למציאת שורת הכותרת "שם פריט" ו"מידה"
                 for idx, row in chunk.iterrows():
-                    row_str = row.astype(str).values
+                    # המרה בטוחה של כל ערכי השורה למחרוזת טקסט כדי למנוע שגיאות float לא ניתנות למעבר
+                    row_str = [str(val) if pd.notna(val) else "" for val in row.values]
+                    
                     if any("שם פריט" in s for s in row_str) and any("מידה" in s for s in row_str):
                         header_row_idx = idx
                         break
@@ -80,7 +85,7 @@ def load_and_parse_data(file_path):
             
             if parsed_chunks:
                 sheet_df = pd.concat(parsed_chunks, ignore_index=True)
-                # טיפול קפדני בערכים ריקים או משובשים בשלב הטעינה
+                # ניקוי והגנה על הערכים בתוך הטבלה המאוחדת
                 sheet_df['שם פריט'] = sheet_df['שם פריט'].fillna('').astype(str).str.strip()
                 sheet_df['מידה'] = sheet_df['מידה'].fillna('').astype(str).str.strip()
                 sheet_df['כמות'] = pd.to_numeric(sheet_df['כמות'], errors='coerce').fillna(0).astype(int)
@@ -138,13 +143,12 @@ else:
         # יצירת טאבים
         tab1, tab2, tab3 = st.tabs(["🔍 צפייה במלאי", "✏️ עדכון כמויות חודשי", "📜 יומן תיעוד שינויים (Log)"])
         
-        # טאב 1 - צפייה (כאן תוקנה השגיאה בעזרת המרה לטקסט נקי)
+        # טאב 1 - צפייה
         with tab1:
             st.subheader(f"📋 רשימת מלאי נוכחית: {selected_location}")
             search_query = st.text_input("חפש פריט מהיר:", "", key="view_search")
             filtered_df = current_df.copy()
             if search_query:
-                # וידוא נוסף שכל הערכים בעמודת החיפוש הם מחרוזות טקסט
                 filtered_df['שם פריט'] = filtered_df['שם פריט'].astype(str)
                 filtered_df = filtered_df[filtered_df['שם פריט'].str.contains(search_query, case=False, na=False)]
             st.dataframe(filtered_df, use_container_width=True, hide_index=True)
