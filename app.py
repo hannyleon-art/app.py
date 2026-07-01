@@ -25,7 +25,7 @@ USER_PROFILES = {
     "משתמש קצה": {"password": "789", "role": "user"}
 }
 
-# 2. שם הקובץ החדש והנקי שלך
+# 2. שם הקובץ
 FILENAME = "mlai_afsankol.xlsx"
 LOG_FILE = "log_שינויי_מלאי.csv"
 
@@ -80,10 +80,11 @@ def load_and_parse_data(file_path):
             
             if parsed_chunks:
                 sheet_df = pd.concat(parsed_chunks, ignore_index=True)
-                sheet_df['שם פריט'] = sheet_df['שם פריט'].astype(str).str.strip()
-                sheet_df['מידה'] = sheet_df['מידה'].astype(str).str.strip()
+                # טיפול קפדני בערכים ריקים או משובשים בשלב הטעינה
+                sheet_df['שם פריט'] = sheet_df['שם פריט'].fillna('').astype(str).str.strip()
+                sheet_df['מידה'] = sheet_df['מידה'].fillna('').astype(str).str.strip()
                 sheet_df['כמות'] = pd.to_numeric(sheet_df['כמות'], errors='coerce').fillna(0).astype(int)
-                sheet_df = sheet_df[sheet_df['שם פריט'] != 'שם פריט']
+                sheet_df = sheet_df[(sheet_df['שם פריט'] != 'שם פריט') & (sheet_df['שם פריט'] != '')]
                 all_data[sheet.strip()] = sheet_df
                 
         return all_data, None
@@ -111,7 +112,7 @@ if not st.session_state.authenticated:
         else:
             st.error("הסיסמה שהוזנה אינה נכונה.")
 else:
-    # המשתמש מחובר - הצגת האפליקציה המלאה
+    # המשתמש מחובר
     st.sidebar.markdown(f"👤 מחובר בתור: **{st.session_state.current_user}**")
     if st.sidebar.button("התנתק 🔓"):
         st.session_state.authenticated = False
@@ -134,19 +135,21 @@ else:
         
         current_df = st.session_state.data_dict[selected_location].copy().reset_index(drop=True)
         
-        # יצירת טאבים: צפייה, עדכון, ויומן שינויים
+        # יצירת טאבים
         tab1, tab2, tab3 = st.tabs(["🔍 צפייה במלאי", "✏️ עדכון כמויות חודשי", "📜 יומן תיעוד שינויים (Log)"])
         
-        # טאב 1 - צפייה
+        # טאב 1 - צפייה (כאן תוקנה השגיאה בעזרת המרה לטקסט נקי)
         with tab1:
             st.subheader(f"📋 רשימת מלאי נוכחית: {selected_location}")
             search_query = st.text_input("חפש פריט מהיר:", "", key="view_search")
             filtered_df = current_df.copy()
             if search_query:
+                # וידוא נוסף שכל הערכים בעמודת החיפוש הם מחרוזות טקסט
+                filtered_df['שם פריט'] = filtered_df['שם פריט'].astype(str)
                 filtered_df = filtered_df[filtered_df['שם פריט'].str.contains(search_query, case=False, na=False)]
             st.dataframe(filtered_df, use_container_width=True, hide_index=True)
             
-        # טאב 2 - עדכון עם חובת זיהוי ורישום
+        # טאב 2 - עדכון
         with tab2:
             st.subheader(f"✍️ עדכון מלאי תקופתי - חודש {selected_month}")
             st.warning(f"שים לב: כל שינוי שיתבצע יירשם באופן מאובטח תחת המשתמש שלך (**{st.session_state.current_user}**).")
@@ -169,10 +172,8 @@ else:
                 else:
                     idx_to_update = current_df[(current_df['שם פריט'] == edit_item) & (current_df['מידה'] == edit_size)].index
                     if not idx_to_update.empty:
-                        # 1. עדכון בזיכרון של האפליקציה
                         st.session_state.data_dict[selected_location].iloc[idx_to_update[0], 2] = new_qty
                         
-                        # 2. רישום ביומן המעקב (Log)
                         log_change(
                             user=st.session_state.current_user,
                             location=selected_location,
@@ -186,7 +187,7 @@ else:
                         st.success(f"✅ המלאי עודכן בהצלחה ונתוני השינוי נרשמו ביומן המערכת!")
                         st.rerun()
 
-        # טאב 3 - הצגת יומן התיעוד והשינויים
+        # טאב 3 - יומן תיעוד
         with tab3:
             st.subheader("📜 היסטוריית פעולות ועדכוני מלאי")
             if os.path.exists(LOG_FILE):
