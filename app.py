@@ -25,14 +25,8 @@ USER_PROFILES = {
     "משתמש קצה": {"password": "789", "role": "user"}
 }
 
-# 2. מציאת הקובץ אוטומטית בתיקייה (פותר את שגיאת "קובץ לא נמצא")
-def find_inventory_file():
-    for f in os.listdir('.'):
-        if 'טבלת מעקב מלאים' in f and f.endswith('.xlsx'):
-            return f
-    return None
-
-FILENAME = find_inventory_file()
+# 2. שם הקובץ החדש והנקי שלך
+FILENAME = "mlai_afsankol.xlsx"
 LOG_FILE = "log_שינויי_מלאי.csv"
 
 # 3. פונקציה לתיעוד שינויים (LOG)
@@ -57,8 +51,8 @@ def log_change(user, location, item, size, old_qty, new_qty, month):
 
 # 4. פונקציה לטעינה וסידור המלאי מאקסל
 def load_and_parse_data(file_path):
-    if not file_path or not os.path.exists(file_path):
-        return None, "שגיאה: קובץ האקסל המקורי לא נמצא בתיקיית האפליקציה."
+    if not os.path.exists(file_path):
+        return None, f"שגיאה: הקובץ '{file_path}' לא נמצא בתיקיית האפליקציה. אנא ודא שהעלית אותו."
     
     try:
         xls = pd.ExcelFile(file_path)
@@ -102,7 +96,6 @@ if 'authenticated' not in st.session_state:
     st.session_state.current_user = None
 
 if not st.session_state.authenticated:
-    st.subplots_adjust = True
     st.header("🔒 כניסה למערכת המלאי - אפסנכל")
     st.write("אנא הזדהה באמצעות הפרופיל שלך כדי להמשיך:")
     
